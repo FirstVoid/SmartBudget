@@ -142,7 +142,8 @@ const Storage = (() => {
 
   const getProfiles = () => {
     const list = Array.from(knownProfiles);
-    if (!list.includes('Основной')) list.unshift('Основной');
+    // Если профилей нет вообще — добавляем дефолтный
+    if (list.length === 0) list.push('Основной');
     return list.map(name => ({ id: name, name: name }));
   };
 

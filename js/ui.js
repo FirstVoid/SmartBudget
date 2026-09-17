@@ -9,12 +9,9 @@ const UI = (() => {
     totalBalance:       document.getElementById('total-balance'),
     todayIncome:        document.getElementById('today-income'),
     todayExpense:       document.getElementById('today-expense'),
-    spentToday:         document.getElementById('spent-today'),
     countToday:         document.getElementById('count-today'),
     dateTodayHint:      document.getElementById('date-today-hint'),
-    spentWeek:          document.getElementById('spent-week'),
     countWeek:          document.getElementById('count-week'),
-    spentMonth:         document.getElementById('spent-month'),
     countMonth:         document.getElementById('count-month'),
     dateMonthHint:      document.getElementById('date-month-hint'),
     incomeToday:        document.getElementById('income-today'),
@@ -52,7 +49,13 @@ const UI = (() => {
     peopleModalDoneBtn: document.getElementById('people-modal-done-btn'),
     peopleList:         document.getElementById('people-list'),
     inputNewPerson:     document.getElementById('input-new-person'),
-    btnSubmitAddPerson: document.getElementById('btn-submit-add-person')
+    btnSubmitAddPerson: document.getElementById('btn-submit-add-person'),
+    netTodayArrow:      document.getElementById('net-today-arrow'),
+    netTodayVal:        document.getElementById('net-today-val'),
+    netWeekArrow:       document.getElementById('net-week-arrow'),
+    netWeekVal:         document.getElementById('net-week-val'),
+    netMonthArrow:      document.getElementById('net-month-arrow'),
+    netMonthVal:        document.getElementById('net-month-val')
   };
 
   // ── Живое форматирование поля суммы (1000000 -> 1 000 000) ──────────────────
@@ -168,7 +171,6 @@ const UI = (() => {
       elements.todayExpense.textContent = '-' + Analytics.formatCurrency(summary.spentToday || 0);
     }
 
-    elements.spentToday.textContent = Analytics.formatCurrency(summary.spentToday);
     elements.countToday.textContent = summary.countToday + ' ' + declension(summary.countToday, ['трата', 'траты', 'трат']);
     if (elements.incomeToday) {
       elements.incomeToday.textContent = '+' + Analytics.formatCurrency(summary.incomeToday || 0);
@@ -177,7 +179,6 @@ const UI = (() => {
       elements.expenseTodayVal.textContent = '-' + Analytics.formatCurrency(summary.spentToday || 0);
     }
 
-    elements.spentWeek.textContent  = Analytics.formatCurrency(summary.spentWeek);
     elements.countWeek.textContent  = summary.countWeek + ' ' + declension(summary.countWeek, ['трата', 'траты', 'трат']);
     if (elements.incomeWeek) {
       elements.incomeWeek.textContent = '+' + Analytics.formatCurrency(summary.incomeWeek || 0);
@@ -186,7 +187,6 @@ const UI = (() => {
       elements.expenseWeekVal.textContent = '-' + Analytics.formatCurrency(summary.spentWeek || 0);
     }
 
-    elements.spentMonth.textContent = Analytics.formatCurrency(summary.spentMonth);
     elements.countMonth.textContent = summary.countMonth + ' ' + declension(summary.countMonth, ['трата', 'траты', 'трат']);
     if (elements.incomeMonth) {
       elements.incomeMonth.textContent = '+' + Analytics.formatCurrency(summary.incomeMonth || 0);
@@ -198,6 +198,38 @@ const UI = (() => {
     const now = new Date();
     elements.dateTodayHint.textContent = now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
     elements.dateMonthHint.textContent = now.toLocaleDateString('ru-RU', { month: 'long' });
+
+    renderPeriodNet(elements.netTodayArrow, elements.netTodayVal, summary.incomeToday || 0, summary.spentToday || 0);
+    renderPeriodNet(elements.netWeekArrow,  elements.netWeekVal,  summary.incomeWeek  || 0, summary.spentWeek  || 0);
+    renderPeriodNet(elements.netMonthArrow, elements.netMonthVal, summary.incomeMonth || 0, summary.spentMonth || 0);
+  };
+
+  /**
+   * Отображает чистый результат периода (доход − расход) со стрелкой и цветом.
+   * Зелёный ↑ если доход > расход, красный ↓ если расход > доход, серый «0» если равно.
+   */
+  const renderPeriodNet = (arrowEl, valEl, income, expense) => {
+    if (!arrowEl || !valEl) return;
+    const net = income - expense;
+    const absNet = Math.abs(net);
+    const formatted = Analytics.formatCurrency(absNet);
+
+    if (net > 0) {
+      arrowEl.textContent = '↑';
+      arrowEl.className = 'period-net-arrow net-positive';
+      valEl.textContent = '+' + formatted;
+      valEl.className = 'period-net-val mono net-positive';
+    } else if (net < 0) {
+      arrowEl.textContent = '↓';
+      arrowEl.className = 'period-net-arrow net-negative';
+      valEl.textContent = '−' + formatted;
+      valEl.className = 'period-net-val mono net-negative';
+    } else {
+      arrowEl.textContent = '→';
+      arrowEl.className = 'period-net-arrow net-neutral';
+      valEl.textContent = '0';
+      valEl.className = 'period-net-val mono net-neutral';
+    }
   };
 
   /**
