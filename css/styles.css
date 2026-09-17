@@ -1872,3 +1872,39 @@ input[type='number'] { -moz-appearance: textfield; }
   color: var(--color-expense);
 }
 
+/* ============================================================
+   Чистый результат периода: доход − расход (net balance)
+   ============================================================ */
+
+.period-net {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  margin-bottom: 6px;
+}
+
+.period-net-arrow {
+  font-size: 2rem;
+  line-height: 1;
+  font-weight: 800;
+}
+
+.period-net-val {
+  font-size: 1.85rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+}
+
+.net-positive {
+  color: var(--color-income);
+}
+
+.net-negative {
+  color: var(--color-expense);
+}
+
+.net-neutral {
+  color: var(--text-muted);
+}
+
