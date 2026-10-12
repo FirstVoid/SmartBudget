@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SmartBudget</string>
+    <string name="sms_permission_rationale">SmartBudget использует разрешение на чтение SMS для автоматического добавления банковских транзакций</string>
+    <string name="loading">Загрузка...</string>
+    <string name="no_connection">Нет подключения к интернету</string>
+</resources>

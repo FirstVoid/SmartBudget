@@ -1,0 +1,24 @@
+R_DEF: Internal format may change without notice
+local
+color accent_primary
+color accent_secondary
+color bg_primary
+color bg_secondary
+color color_expense
+color color_income
+color text_primary
+color text_secondary
+drawable ic_launcher_background
+drawable ic_launcher_foreground
+id progressBar
+id swipeRefresh
+id webView
+layout activity_main
+mipmap ic_launcher
+mipmap ic_launcher_round
+string app_name
+string loading
+string no_connection
+string sms_permission_rationale
+style Theme.SmartBudgetApp
+xml network_security_config
