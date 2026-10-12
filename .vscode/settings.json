@@ -1,7 +1,0 @@
-{
-  "java.configuration.updateBuildConfiguration": "disabled",
-  "java.import.gradle.enabled": false,
-  "java.project.resourceFilters": [
-    "SmartBudgetApp"
-  ]
-}

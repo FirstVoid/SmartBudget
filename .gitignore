@@ -1,0 +1,12 @@
+# Android Application (локальный проект, не нужен для сайта)
+SmartBudgetApp/
+
+# IDE & Editor
+.vscode/
+*.swp
+*.bak
+
+# OS generated files
+Thumbs.db
+.DS_Store
+*.log
