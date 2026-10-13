@@ -530,7 +530,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     e.preventDefault();
 
     const editId     = document.getElementById('edit-id').value;
-    const rawAmount  = document.getElementById('input-amount').value.replace(/\s/g, '');
+    const rawAmount  = document.getElementById('input-amount').value.replace(/[\s\u00A0]/g, '');
     const amountVal  = parseInt(rawAmount, 10);
     const personVal  = personSelect ? personSelect.value : 'Не указан';
     let reasonVal    = document.getElementById('input-note').value.trim();

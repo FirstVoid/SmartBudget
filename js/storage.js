@@ -5,8 +5,8 @@
  */
 
 const Storage = (() => {
-  const SUPABASE_URL = "https://tdlhwokrmuyxsdleepht.supabase.co";
-  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRkbGh3b2tybXV5eHNkbGVlcGh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk0MDc3ODAsImV4cCI6MjA4NDk4Mzc4MH0.RlfUmejx2ywHNcFofZM4mNE8nIw6qxaTNzqxmf4N4-4";
+  const SUPABASE_URL = "https://ovcimbnjociehuollwuv.supabase.co";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im92Y2ltYm5qb2NpZWh1b2xsd3V2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5MDg2OTAsImV4cCI6MjEwNzQ4NDY5MH0.kGwSbNaQmEqcOs8xm3xSUd_VsGW7dyrQ_tCKbehDhoI";
 
   let supabaseClient = null;
   const initSupabase = () => {
@@ -27,6 +27,160 @@ const Storage = (() => {
   let memoryCache = [];
   let knownProfiles = new Set(['Основной']);
   let activeProfile = 'Основной';
+
+  // ─── Оффлайн-хранилище записей (localStorage) ─────────────────────────────
+  const STORAGE_OFFLINE_TXS_KEY = 'smart_budget_offline_txs_v1';
+  let isSyncing = false;
+
+  const getOfflineQueue = () => {
+    try {
+      const raw = localStorage.getItem(STORAGE_OFFLINE_TXS_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) {
+      console.warn('Ошибка чтения offline очереди:', e);
+      return [];
+    }
+  };
+
+  const saveOfflineQueue = (queue) => {
+    try {
+      if (!queue || queue.length === 0) {
+        localStorage.removeItem(STORAGE_OFFLINE_TXS_KEY);
+      } else {
+        localStorage.setItem(STORAGE_OFFLINE_TXS_KEY, JSON.stringify(queue));
+      }
+    } catch (e) {
+      console.warn('Ошибка сохранения offline очереди:', e);
+    }
+  };
+
+  const addOfflineRecord = (record) => {
+    const queue = getOfflineQueue();
+    if (!queue.some(item => item.id === record.id)) {
+      queue.unshift(record);
+      saveOfflineQueue(queue);
+    }
+  };
+
+  const removeOfflineRecord = (id) => {
+    const queue = getOfflineQueue();
+    const filtered = queue.filter(item => item.id !== id);
+    saveOfflineQueue(filtered);
+  };
+
+  const updateOfflineRecord = (id, updatedData) => {
+    const queue = getOfflineQueue();
+    const idx = queue.findIndex(item => item.id === id);
+    if (idx !== -1) {
+      queue[idx] = { ...queue[idx], ...updatedData };
+      saveOfflineQueue(queue);
+    }
+  };
+
+  // Загружаем сохраненные оффлайн-записи в оперативную память при старте
+  const loadOfflineTransactions = () => {
+    const offlineList = getOfflineQueue();
+    offlineList.forEach(t => {
+      if (!memoryCache.some(existing => existing.id === t.id)) {
+        memoryCache.unshift(t);
+      }
+      if (t.profile_id) {
+        knownProfiles.add(t.profile_id);
+      }
+    });
+  };
+  loadOfflineTransactions();
+
+  /**
+   * Синхронизация отложенных оффлайн-записей с Supabase.
+   * После успешной записи в базу данных запись удаляется из оффлайн-хранилища.
+   */
+  const syncOfflineTransactions = async () => {
+    if (isSyncing) return false;
+    initSupabase();
+    if (!supabaseClient) return false;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return false;
+
+    const queue = getOfflineQueue();
+    if (!queue || queue.length === 0) return false;
+
+    isSyncing = true;
+    let syncedCount = 0;
+
+    try {
+      const currentItems = [...queue];
+
+      for (const item of currentItems) {
+        const payload = {
+          type: item.type === 'income' ? 'income' : 'expense',
+          amount: Math.round(Math.abs(parseFloat(item.amount))),
+          note: (item.note || '').trim() || 'Не указано',
+          date: item.date || new Date().toISOString().split('T')[0],
+          time: item.time || '00:00',
+          profile_id: item.profile_id || 'Основной'
+        };
+
+        const { data, error } = await supabaseClient
+          .from('transactions')
+          .insert([payload])
+          .select();
+
+        if (!error && data && data[0]) {
+          const inserted = {
+            ...data[0],
+            amount: Math.round(Math.abs(parseFloat(data[0].amount))),
+            profile_id: data[0].profile_id || payload.profile_id
+          };
+
+          // Удаляем запись из оффлайн-хранилища после записи в базу данных
+          removeOfflineRecord(item.id);
+
+          // Заменяем временный local_ ID на настоящий ID из БД в оперативной памяти
+          const cacheIdx = memoryCache.findIndex(t => t.id === item.id);
+          if (cacheIdx !== -1) {
+            memoryCache[cacheIdx] = inserted;
+          } else if (!memoryCache.some(t => t.id === inserted.id)) {
+            memoryCache.unshift(inserted);
+          }
+
+          syncedCount++;
+        } else {
+          console.warn('Не удалось синхронизировать оффлайн запись:', error ? error.message : error);
+          break;
+        }
+      }
+    } catch (err) {
+      console.warn('Ошибка при синхронизации оффлайн записей:', err);
+    } finally {
+      isSyncing = false;
+    }
+
+    if (syncedCount > 0) {
+      console.log(`Успешно синхронизировано ${syncedCount} оффлайн-записей в базу данных.`);
+      return true;
+    }
+
+    return false;
+  };
+
+  // Автоматическая синхронизация при появлении интернет-соединения
+  if (typeof window !== 'undefined') {
+    window.addEventListener('online', async () => {
+      console.log('Интернет-соединение восстановлено. Синхронизируем оффлайн-записи...');
+      const didSync = await syncOfflineTransactions();
+      if (didSync) {
+        await fetchTransactions();
+        if (typeof window.updateApp === 'function') {
+          window.updateApp();
+        }
+        if (typeof UI !== 'undefined' && UI.showToast) {
+          UI.showToast('Оффлайн-записи успешно сохранены в базу данных!');
+        }
+      }
+    });
+  }
 
   // ─── Персоны / Имена для записей ─────────────────────────────────────────────
   const STORAGE_PEOPLE_KEY = 'smart_budget_people_v1';
@@ -147,7 +301,6 @@ const Storage = (() => {
     return list.map(name => ({ id: name, name: name }));
   };
 
-  const loadProfiles = () => getProfiles();
 
   const setActiveProfile = (name) => {
     if (name && typeof name === 'string') {
@@ -238,7 +391,7 @@ const Storage = (() => {
       seenIds.add(item.id);
 
       const parsedAmount = Math.round(Math.abs(parseFloat(item.amount)));
-      if (isNaN(parsedAmount) || parsedAmount < 0) continue;
+      if (isNaN(parsedAmount)) continue;
 
       let pid = item.profile_id;
       if (!pid || pid === 'default') {
@@ -263,7 +416,12 @@ const Storage = (() => {
   // ─── CRUD транзакций ──────────────────────────────────────────────────────────
 
   const fetchTransactions = async () => {
-    // Пытаемся инициализировать клиент, если ещё не готов (CDN мог загрузиться позже)
+    // Сначала пробуем отправить накопившиеся оффлайн-записи
+    try {
+      await syncOfflineTransactions();
+    } catch (_) {}
+
+    // Инициализируем клиент, если ещё не готов
     initSupabase();
     if (!supabaseClient) return getTransactions();
 
@@ -279,9 +437,17 @@ const Storage = (() => {
         return getTransactions();
       }
 
-      memoryCache = deduplicateAndValidate(data || []);
+      const validatedData = deduplicateAndValidate(data || []);
 
-      // Наполняем профили прямо из ячеек базы данных
+      // Оставляем в памяти ещё не синхронизированные оффлайн-записи
+      const pendingOffline = getOfflineQueue();
+      const existingIds = new Set(validatedData.map(d => d.id));
+      const stillPending = pendingOffline.filter(p => !existingIds.has(p.id));
+
+      // Объединяем: ожидающие оффлайн-записи + актуальные данные из базы
+      memoryCache = [...stillPending, ...validatedData];
+
+      // Наполняем профили прямо из ячеек базы данных и оффлайн записей
       knownProfiles = new Set(['Основной']);
       memoryCache.forEach(t => {
         if (t.profile_id) {
@@ -317,14 +483,16 @@ const Storage = (() => {
     const newRecord = {
       type: txData.type === 'income' ? 'income' : 'expense',
       amount: Math.round(Math.abs(parseFloat(txData.amount))),
-      note: (txData.note || '').trim(),
-      date: txData.date,
-      time: txData.time,
+      note: (txData.note || '').trim() || 'Не указано',
+      date: txData.date || new Date().toISOString().split('T')[0],
+      time: txData.time || '00:00',
       profile_id: currentTarget // ПРЯМОЕ НАЗВАНИЕ ПРОФИЛЯ ("Основной", "Работа", "Карта" и т.д.)
     };
 
     initSupabase();
-    if (supabaseClient) {
+    const isOnline = typeof navigator === 'undefined' || navigator.onLine;
+
+    if (supabaseClient && isOnline) {
       try {
         const { data, error } = await supabaseClient
           .from('transactions')
@@ -350,13 +518,18 @@ const Storage = (() => {
       }
     }
 
-    // Если нет связи с базой данных
+    // Если нет связи с базой данных — сохраняем оффлайн локально
     const offlineRecord = {
       id: 'local_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
       ...newRecord,
       created_at: new Date().toISOString()
     };
-    memoryCache.unshift(offlineRecord);
+
+    addOfflineRecord(offlineRecord);
+
+    if (!memoryCache.some(t => t.id === offlineRecord.id)) {
+      memoryCache.unshift(offlineRecord);
+    }
     return offlineRecord;
   };
 
@@ -374,8 +547,13 @@ const Storage = (() => {
       memoryCache[index] = { ...memoryCache[index], ...payload };
     }
 
+    if (String(id).startsWith('local_')) {
+      updateOfflineRecord(id, payload);
+      return true;
+    }
+
     initSupabase();
-    if (supabaseClient && !id.startsWith('local_')) {
+    if (supabaseClient) {
       try {
         const { error } = await supabaseClient
           .from('transactions')
@@ -396,8 +574,13 @@ const Storage = (() => {
   const deleteTransaction = async (id) => {
     memoryCache = memoryCache.filter(t => t.id !== id);
 
+    if (String(id).startsWith('local_')) {
+      removeOfflineRecord(id);
+      return true;
+    }
+
     initSupabase();
-    if (supabaseClient && !id.startsWith('local_')) {
+    if (supabaseClient) {
       try {
         const { error } = await supabaseClient
           .from('transactions')
@@ -425,6 +608,8 @@ const Storage = (() => {
     updateTransaction,
     deleteTransaction,
     getTransactionById,
+    syncOfflineTransactions,
+    getOfflineQueue,
     getProfiles,
     addProfile,
     renameProfile,

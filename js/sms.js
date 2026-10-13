@@ -89,15 +89,12 @@ async function processSms(sender, body, timestamp) {
         return; // Неизвестный или неподдерживаемый тип операции
     }
     
-    // Извлекаем сумму
+    // Извлекаем сумму (UZCARD всегда отправляет целые суммы в сумах)
     const summaMatch = body.match(/Summa:\s*([\d\s,\.]+)/i);
     if (!summaMatch) return;
     
-    let amountStr = summaMatch[1].replace(/[^\d]/g, '');
-    let amount = parseInt(amountStr, 10);
-    if (summaMatch[1].trim().match(/[,.]\d{2}$/)) {
-        amount = Math.floor(amount / 100);
-    }
+    const amountStr = summaMatch[1].replace(/[^\d]/g, '');
+    const amount = parseInt(amountStr, 10);
     
     if (isNaN(amount) || amount <= 0) return;
     
@@ -105,11 +102,8 @@ async function processSms(sender, body, timestamp) {
     const qoldiqMatch = body.match(/Qoldiq:\s*([\d\s,\.]+)/i);
     let qoldiq = -1;
     if (qoldiqMatch) {
-        let qStr = qoldiqMatch[1].replace(/[^\d]/g, '');
+        const qStr = qoldiqMatch[1].replace(/[^\d]/g, '');
         qoldiq = parseInt(qStr, 10);
-        if (qoldiqMatch[1].trim().match(/[,.]\d{2}$/)) {
-            qoldiq = Math.floor(qoldiq / 100);
-        }
     }
     
     // Извлекаем торговую точку или приложение (Joy / Ilova / Xizmat), не захватывая Qoldiq и точку с запятой
@@ -221,8 +215,8 @@ async function processSmsTransactionAsync(type, amount, vendor, person, qoldiq, 
 
 document.addEventListener('DOMContentLoaded', () => {
     setTimeout(() => {
-        if (typeof checkPendingSms === 'function') {
-            checkPendingSms();
+        if (typeof window.checkPendingSms === 'function') {
+            window.checkPendingSms();
         }
     }, 1500);
 });

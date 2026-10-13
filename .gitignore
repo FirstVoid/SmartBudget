@@ -10,3 +10,10 @@ SmartBudgetApp/
 Thumbs.db
 .DS_Store
 *.log
+
+# Agent Skills & Configs
+.agents/
+.claude/
+agent/
+skills-lock.json
+

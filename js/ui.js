@@ -57,7 +57,8 @@ const UI = (() => {
     netWeekArrow:       document.getElementById('net-week-arrow'),
     netWeekVal:         document.getElementById('net-week-val'),
     netMonthArrow:      document.getElementById('net-month-arrow'),
-    netMonthVal:        document.getElementById('net-month-val')
+    netMonthVal:        document.getElementById('net-month-val'),
+    dateWeekHint:       document.getElementById('date-week-hint')
   };
 
   // ── Живое форматирование поля суммы (1000000 -> 1 000 000) ──────────────────
@@ -207,6 +208,14 @@ const UI = (() => {
     const now = new Date();
     elements.dateTodayHint.textContent = now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
     elements.dateMonthHint.textContent = now.toLocaleDateString('ru-RU', { month: 'long' });
+    if (elements.dateWeekHint) {
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - 6);
+      elements.dateWeekHint.textContent =
+        weekStart.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' }) +
+        ' – ' +
+        now.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+    }
 
     renderPeriodNet(elements.netTodayArrow, elements.netTodayVal, summary.incomeToday || 0, summary.spentToday || 0);
     renderPeriodNet(elements.netWeekArrow,  elements.netWeekVal,  summary.incomeWeek  || 0, summary.spentWeek  || 0);
@@ -326,6 +335,14 @@ const UI = (() => {
     dateText.className = 'tx-date-text';
     dateText.textContent = formatDateRu(t.date);
     metaRow.appendChild(dateText);
+
+    if (String(t.id).startsWith('local_')) {
+      const offlineBadge = document.createElement('span');
+      offlineBadge.className = 'tx-offline-badge';
+      offlineBadge.textContent = 'Офлайн';
+      offlineBadge.title = 'Сохранено на устройстве, ожидает отправки в базу данных';
+      metaRow.appendChild(offlineBadge);
+    }
 
     infoDiv.appendChild(metaRow);
     leftDiv.appendChild(infoDiv);
@@ -552,7 +569,13 @@ const UI = (() => {
     const toast = document.createElement('div');
     toast.className = 'toast toast-' + type;
     const icon = type === 'success' ? '\u2713' : (type === 'error' ? '\u2715' : '\u2139');
-    toast.innerHTML = '<span class="toast-icon">' + icon + '</span><span>' + message + '</span>';
+    const iconSpan = document.createElement('span');
+    iconSpan.className = 'toast-icon';
+    iconSpan.textContent = icon;
+    const msgSpan = document.createElement('span');
+    msgSpan.textContent = message;
+    toast.appendChild(iconSpan);
+    toast.appendChild(msgSpan);
     elements.toastContainer.appendChild(toast);
     setTimeout(() => {
       toast.style.opacity   = '0';
